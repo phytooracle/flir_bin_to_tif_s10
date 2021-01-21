@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 from osgeo import gdal, osr
 import math
 from numpy.matlib import repmat
+import pandas as pd
 
 
 # --------------------------------------------------
@@ -40,6 +41,14 @@ def get_args():
                         type=str,
                         required=True)
                         #default='cleanmetadata_out')
+
+    parser.add_argument('-c',
+                        '--csv',
+                        help='CSV containing image and atmospheric temperatures',
+                        metavar='str',
+                        type=str,
+                        required=True)
+
     parser.add_argument('-z',
                         '--zoffset',
                         help='Z-axis offset',
@@ -77,9 +86,9 @@ def get_boundingbox(metadata, z_offset):
     gantry_z = float(meta['gantry_system_variable_metadata']['position z [m]']) + z_offset + loc_gantry_z#offset in m
 
     fov_x, fov_y = float(meta['sensor_fixed_metadata']['field of view x [m]']), float(meta['sensor_fixed_metadata']['field of view y [m]'])
-    
+
     img_height, img_width = 640, 480
-    
+
     B = gantry_z
     A_x = np.arctan((0.5*float(fov_x))/2)
     A_y = np.arctan((0.5*float(fov_y))/2)
@@ -108,7 +117,7 @@ def get_boundingbox(metadata, z_offset):
 
 
 # --------------------------------------------------
-def flirRawToTemperature(rawData, meta):
+def flirRawToTemperature(rawData, meta, atm_temp):
 
     R = 16923.6
     B = 1434.6
@@ -129,21 +138,17 @@ def flirRawToTemperature(rawData, meta):
 
     K0 = 273.15
     H = 0.1
+    #T = int(float(meta['sensor_variable_metadata']['shutter temperature [K]']))
 
-    if 'shutter temperature [K]' in meta['sensor_variable_metadata']:
-        T = int(float(meta['sensor_variable_metadata']['shutter temperature [K]']) - 273.15) 
-    else: 
-        T = int(float(meta['sensor_variable_metadata']['shutter_temperature_K']) - 273.15)
-    
+    T = int(float(meta['sensor_variable_metadata']['shutter temperature [K]']) - 273.15)
+
     D = 2.5
     E = 0.98
 
     im = rawData
 
-    # AmbTemp = T
-    # AtmTemp = T
-    AmbTemp = T + K0
-    AtmTemp = T + K0
+    AmbTemp = atm_temp
+    AtmTemp = atm_temp
 
     H2OInGperM2 = H*math.exp(H2O_K1 + H2O_K2*T + H2O_K3*math.pow(T, 2) + H2O_K4*math.pow(T, 3))
     #H2OInGperM2 = H*math.exp(H2O_K1 + H2O_K2*T + H2O_K3*(T**2) + H2O_K4*(T**3))
@@ -179,6 +184,12 @@ def main():
         os.makedirs(args.outdir)
 
     bin_file = args.bin
+    meta_query = os.path.basename(args.metadata)
+    df = pd.read_csv(args.csv).set_index('Image Name')
+    atm_temp = float(df.loc[meta_query, 'temperature']) + 273.15
+
+    print(atm_temp)
+
     if bin_file is not None:
         with open(args.metadata, 'r') as mdf:
 
@@ -189,15 +200,16 @@ def main():
                 if bin_file is not None:
                     out_file = os.path.join(args.outdir, bin_file.split('/')[-1].replace(".bin", ".tif"))
 
-                    #gps_bounds_bin = geojson_to_tuples(
-                        #full_md['spatial_metadata']['flirIrCamera']['bounding_box'])
                     gps_bounds_bin, img_height, img_width = get_boundingbox(args.metadata, args.zoffset)
-                    
+
                     raw_data = np.fromfile(bin_file, np.dtype('<u2')).reshape(
                         [480, 640]).astype('float')
                     raw_data = np.rot90(raw_data, 3)
 
-                    tc = flirRawToTemperature(raw_data, full_md)
+                    tc = flirRawToTemperature(raw_data, full_md, atm_temp)
+                    #tc = np.array(tc) - atm_temp
+                    #tc = (tc - np.nanmin(tc))/(np.nanmax(tc) - np.nanmin(tc))
+
                     create_geotiff(tc, gps_bounds_bin, out_file, None,
                                 True, extractor_info, None, compress=True)
 
