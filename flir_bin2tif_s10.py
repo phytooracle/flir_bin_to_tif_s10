@@ -147,8 +147,8 @@ def flirRawToTemperature(rawData, meta, atm_temp):
 
     im = rawData
 
-    AmbTemp = atm_temp
-    AtmTemp = atm_temp
+    AmbTemp = T + K0
+    AtmTemp = T + K0
 
     H2OInGperM2 = H*math.exp(H2O_K1 + H2O_K2*T + H2O_K3*math.pow(T, 2) + H2O_K4*math.pow(T, 3))
     #H2OInGperM2 = H*math.exp(H2O_K1 + H2O_K2*T + H2O_K3*(T**2) + H2O_K4*(T**3))
@@ -208,7 +208,7 @@ def main():
 
                     tc = flirRawToTemperature(raw_data, full_md, atm_temp)
                     #tc = np.array(tc) - atm_temp
-                    #tc = (tc - np.nanmin(tc))/(np.nanmax(tc) - np.nanmin(tc))
+                    tc = (tc - np.nanmin(tc))/(np.nanmax(tc) - np.nanmin(tc))
 
                     create_geotiff(tc, gps_bounds_bin, out_file, None,
                                 True, extractor_info, None, compress=True)
