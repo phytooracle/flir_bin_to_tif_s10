@@ -22,4 +22,4 @@ Decompressed flir geotiffs from `.bin` to `.tif`.
 - Metadata has to match name of input flir bin such as `example_0.bin`, `example_0_metadata.bin`    
                                         
 ## Executing example (using singularity)
-`singularity run -B $(pwd):/mnt --pwd /mnt/ docker://cosimichele/flir_bin_to_tif_s10 -m <metadata.json> <bin_dir>`
+`singularity run -B $(pwd):/mnt --pwd /mnt/ docker://phytooracle/flir_bin_to_tif_s10 -m <metadata.json> <bin_dir>`
